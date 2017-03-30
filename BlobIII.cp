@@ -72,17 +72,22 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions){
     cout<<"Rows: "<<source.rows<<" Columns: "<<source.cols<<endl;
 
     int k = 0;
-    int lookUpTable[1000][4];           //Column 1 contains the areas
-                                        //Column 2 contains the sum of X
-                                        //Column 3 contains the sum of Y
-    for(int i = 0; i<1000; i++){
+    int lookUpTable[1000][4];           //Column 0 contains the region index
+                                        //Column 1 contains the areas
+                                        //Column 2 contains ∑ X
+                                        //Column 3 contains ∑ Y
+                                        //Column 4 contains ∑ X^2
+                                        //Column 5 contains ∑ Y^2
+                                        //Column 6 contains ∑ X * Y
+
+    for(int i = 0; i<1000; i++) {
         lookUpTable[i][0] = 0;
         lookUpTable[i][1] = 0;
         lookUpTable[i][2] = 0;
         lookUpTable[i][3] = 0;
         lookUpTable[i][4] = 0;
-        lookUpTable[i][5] = 0;      
-        lookUpTable[i][6] = 0;      //Sum x*y
+        lookUpTable[i][5] = 0;
+        lookUpTable[i][6] = 0;
     }
 
     lookUpTable[0][0] = 0;
@@ -310,3 +315,14 @@ int main(int argc, char** argv )
 
     return 0;
 }
+
+/**
+
+m_00 = lookUpTable[k][1]
+m_10 = lookUpTable[k][2];
+m_01 = lookUpTable[k][3];
+m_20 = lookUpTable[k][4];
+m_02 = lookUpTable[k][5];
+m_11 = lookUpTable[k][6];
+
+**/
