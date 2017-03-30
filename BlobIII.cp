@@ -325,4 +325,7 @@ m_20 = lookUpTable[k][4];
 m_02 = lookUpTable[k][5];
 m_11 = lookUpTable[k][6];
 
+u_20 = m_02 - m_10 * m_10/m_00;
+u_20 = m_02 -  1/m_00;
+
 **/
