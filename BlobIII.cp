@@ -251,6 +251,30 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions){
     for(int i=0; i<k;i++){
         //cout<<i<<" "<<lookUpTable[i][0]<<endl;
         if(lookUpTable[i][1] > 200){
+             // Momentos geometricos de orden p y q m_pq = ∑_x∑_y   x^p * y^q * f(x,y):
+            // con f(x,y) = 1;
+            m_00 = lookUpTable[k][1]
+            m_10 = lookUpTable[k][2];
+            m_01 = lookUpTable[k][3];
+            m_20 = lookUpTable[k][4];
+            m_02 = lookUpTable[k][5];
+            m_11 = lookUpTable[k][6];
+    
+            u_20 = m_20 - m_10 * m_10/m_00;
+            u_02 = m_20 - m_01 * m_01/m_00;
+            u_11 = m_11 - m_01/m_00 * m_10;
+    
+            //Momentos centrales normalizados de 2ndo orden:
+            n_20 = (m_20 - m_10 * m_10 / m_00) / (m_00 * m_00);
+            n_02 = (m_02 - m_01 * m_01 / m_00) / (m_00 * m_00);
+            n_11 = (m_11 - m_10 * m_01 / m_00) / (m_00 * m_00);
+    
+            //Momentos de Hu
+            phi_1 = n_20 + n_02;
+            phi_2 = pow(n_20 - n_02, 2) + 4 * n_11 * n_11;
+            theta = 1/2 * atan2(2 * u_11, u_20 - u_02);
+            //phi : ángulo de la recta entre centroides
+            //theta : ángulo de orientación del robot
             printf("Region: %3d Area: %6d pixels  Color: %7s  Xc: %4d  Yc: %4d\n", 
                     i,lookUpTable[i][1],colorName[(i%7)+1].c_str(),(lookUpTable[i][2]/lookUpTable[i][1]),(lookUpTable[i][3]/lookUpTable[i][1]));
             //printf("Region: %3d K: %3d Area: %6d pixels %s\n", i,lookUpTable[i][0],lookUpTable[i][1],colorName[(i%7)+1].c_str());
@@ -268,30 +292,6 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions){
         }
     }
     cout<<endl;  
-    // Momentos geometricos de orden p y q m_pq = ∑_x∑_y   x^p * y^q * f(x,y):
-    // con f(x,y) = 1;
-    m_00 = lookUpTable[k][1]
-    m_10 = lookUpTable[k][2];
-    m_01 = lookUpTable[k][3];
-    m_20 = lookUpTable[k][4];
-    m_02 = lookUpTable[k][5];
-    m_11 = lookUpTable[k][6];
-    
-    u_20 = m_20 - m_10 * m_10/m_00;
-    u_02 = m_20 - m_01 * m_01/m_00;
-    u_11 = m_11 - m_01/m_00 * m_10;
-    
-    //Momentos centrales normalizados de 2ndo orden:
-    n_20 = (m_20 - m_10 * m_10 / m_00) / (m_00 * m_00);
-    n_02 = (m_02 - m_01 * m_01 / m_00) / (m_00 * m_00);
-    n_11 = (m_11 - m_10 * m_01 / m_00) / (m_00 * m_00);
-    
-    //Momentos de Hu
-    phi_1 = n_20 + n_02;
-    phi_2 = pow(n_20 - n_02, 2) + 4 * n_11 * n_11;
-    theta = 1/2 * atan2(2 * u_11, u_20 - u_02);
-    //phi : ángulo de la recta entre centroides
-    //theta : ángulo de orientación del robot
 }
 
 
