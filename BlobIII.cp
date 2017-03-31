@@ -339,7 +339,7 @@ n_11 = (m_11 - m_10 * m_01 / m_00) / (m_00 * m_00);
 phi_1 = n_20 + n_02;
 phi_2 = pow(n_20 - n_02, 2) + 4 * n_11 * n_11;
 theta = 1/2 * atan2(2 * u_11, u_20 - u_02);
-gamma = theta - phi;
+//gamma = theta - phi;
 
 
 //phi : ángulo de la recta entre centroides
