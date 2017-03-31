@@ -115,8 +115,8 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions){
                     lookUpTable[k][1]++;
                     lookUpTable[k][2] = j;
                     lookUpTable[k][3] = i;
-                    lookUpTable[k][4] = j^2;
-                    lookUpTable[k][5] = i^2;
+                    lookUpTable[k][4] = j*j;
+                    lookUpTable[k][5] = i*i;
                     lookUpTable[k][6] = j*i;
                     destination.at<Vec3b>(i,j)[0] = colors[k%7+1][0];
                     destination.at<Vec3b>(i,j)[1] = colors[k%7+1][1];
@@ -129,8 +129,8 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions){
                     lookUpTable[left][1]++;
                     lookUpTable[left][2]+= j;
                     lookUpTable[left][3]+= i;
-                    lookUpTable[left][4]+= j^2;
-                    lookUpTable[left][5]+= i^2;
+                    lookUpTable[left][4]+= j*j;
+                    lookUpTable[left][5]+= i*i;
                     lookUpTable[left][6]+= j*i;
                     //lookUpTable[k][0] = temporal[i][j-1];
                     destination.at<Vec3b>(i,j)[0] = colors[(temporal[i][j-1])%7+1][0];
@@ -144,8 +144,8 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions){
                     lookUpTable[top][1]++;
                     lookUpTable[top][2]+= j;
                     lookUpTable[top][3]+= i;
-                    lookUpTable[top][4]+= j^2;
-                    lookUpTable[top][5]+= i^2;
+                    lookUpTable[top][4]+= j*j;
+                    lookUpTable[top][5]+= i*i;
                     lookUpTable[top][6]+= j*i;
                     //lookUpTable[k][0] = temporal[i-1][j];
                     destination.at<Vec3b>(i,j)[0] = colors[(temporal[i-1][j])%7+1][0];
@@ -163,8 +163,8 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions){
                         lookUpTable[top][1]++;
                         lookUpTable[top][2]+= j;
                         lookUpTable[top][3]+= i;
-                        lookUpTable[top][4]+= j^2;
-                        lookUpTable[top][5]+= i^2;
+                        lookUpTable[top][4]+= j*j;
+                        lookUpTable[top][5]+= i*i;
                         lookUpTable[top][6]+= j*i;
                         //lookUpTable[k][0] = temporal[i-1][j];
                         lookUpTable[left][0] = top;
@@ -175,8 +175,8 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions){
                         lookUpTable[left][1]++;
                         lookUpTable[left][2]+= j;
                         lookUpTable[left][3]+= i;
-                        lookUpTable[left][4]+= j^2;
-                        lookUpTable[left][5]+= i^2;
+                        lookUpTable[left][4]+= j*j;
+                        lookUpTable[left][5]+= i*i;
                         lookUpTable[left][6]+= j*i;
                         //lookUpTable[k][0] = temporal[i][j-1];
                         lookUpTable[top][0] = left;
@@ -267,7 +267,31 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions){
             //Scalar(colors[(lookUpTable[finalIndex][0]+1)%7+1][0], colors[(lookUpTable[finalIndex][0]+1)%7+1][1], colors[(lookUpTable[finalIndex][0]+1)%7+1][2]), 
         }
     }
-    cout<<endl;   
+    cout<<endl;  
+    // Momentos geometricos de orden p y q m_pq = ∑_x∑_y   x^p * y^q * f(x,y):
+    // con f(x,y) = 1;
+    m_00 = lookUpTable[k][1]
+    m_10 = lookUpTable[k][2];
+    m_01 = lookUpTable[k][3];
+    m_20 = lookUpTable[k][4];
+    m_02 = lookUpTable[k][5];
+    m_11 = lookUpTable[k][6];
+    
+    u_20 = m_20 - m_10 * m_10/m_00;
+    u_02 = m_20 - m_01 * m_01/m_00;
+    u_11 = m_11 - m_01/m_00 * m_10;
+    
+    //Momentos centrales normalizados de 2ndo orden:
+    n_20 = (m_20 - m_10 * m_10 / m_00) / (m_00 * m_00);
+    n_02 = (m_02 - m_01 * m_01 / m_00) / (m_00 * m_00);
+    n_11 = (m_11 - m_10 * m_01 / m_00) / (m_00 * m_00);
+    
+    //Momentos de Hu
+    phi_1 = n_20 + n_02;
+    phi_2 = pow(n_20 - n_02, 2) + 4 * n_11 * n_11;
+    theta = 1/2 * atan2(2 * u_11, u_20 - u_02);
+    //phi : ángulo de la recta entre centroides
+    //theta : ángulo de orientación del robot
 }
 
 
