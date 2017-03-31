@@ -209,7 +209,7 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions){
         cout<<i<<": "<<lookUpTable[i][0]<<endl;
     */
     
-    int finalIndex, tempArea, tempX, tempY;
+    int finalIndex, tempArea, tempX, tempY, tempXSquare, tempYSquare, tempXY;
     for(int i = 0; i< source.rows; i++){
         for(int j = 0; j< source.cols;j++){
             if(temporal[i][j] > 0){
