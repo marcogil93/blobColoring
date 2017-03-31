@@ -317,7 +317,8 @@ int main(int argc, char** argv )
 }
 
 /**
-
+// Momentos geometricos de orden p y q m_pq = ∑_x∑_y   x^p * y^q * f(x,y):
+// con f(x,y) = 1;
 m_00 = lookUpTable[k][1]
 m_10 = lookUpTable[k][2];
 m_01 = lookUpTable[k][3];
@@ -325,8 +326,25 @@ m_20 = lookUpTable[k][4];
 m_02 = lookUpTable[k][5];
 m_11 = lookUpTable[k][6];
 
-u_20 = m_02 - m_10 * m_10/m_00;
-u_20 = m_02 -  1/m_00;
-u_02 = m_20 -  1/m_00;
+u_20 = m_20 - m_10 * m_10/m_00;
+u_02 = m_20 - m_01 * m_01/m_00;
+u_11 = m_11 - m_01/m_00 * m_10;
+
+//Momentos centrales normalizados de 2ndo orden:
+n_20 = (m_20 - m_10 * m_10 / m_00) / (m_00 * m_00);
+n_02 = (m_02 - m_01 * m_01 / m_00) / (m_00 * m_00);
+n_11 = (m_11 - m_10 * m_01 / m_00) / (m_00 * m_00);
+
+//Momentos de Hu
+phi_1 = n_20 + n_02;
+phi_2 = pow(n_20 - n_02, 2) + 4 * n_11 * n_11;
+theta = 1/2 * atan2(2 * u_11, u_20 - u_02);
+gamma = theta - phi;
+
+
+//phi : ángulo de la recta entre centroides
+//theta : ángulo de orientación del robot
+//gamma: ángulo de giro (theta – phi )
+
 
 **/
