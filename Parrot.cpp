@@ -2,12 +2,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include "SDL/SDL.h"
-/*
- * A simple 'getting started' interface to the ARDrone, v0.2 
- * author: Tom Krajnik
- * The code is straightforward,
- * check out the CHeli class and main() to see 
- */
+
 #include <stdlib.h>
 #include "CHeli.h"
 #include <unistd.h>
