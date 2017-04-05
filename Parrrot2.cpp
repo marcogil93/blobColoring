@@ -23,6 +23,15 @@ CHeli *heli;
 float pitch, roll, yaw, height;
 int hover;
 
+//Training variables
+float phis_1[20];
+float phis_2[20];
+float phis_1_sd;
+float phis_1_average;
+float phis_2_sd;
+float phis_2_average;
+int training_counter = 0;
+
 // Joystick related
 SDL_Joystick* m_joystick;
 bool useJoystick;
@@ -85,8 +94,8 @@ int hMin = 0;
 int hMax = 0;
 int sMin = 0;
 int sMax = 0; 
-int vMin = 184;
-int vMax = 216;
+int vMin = 168;
+int vMax = 232;
 
 char meanMat3[3][3]  =  {{1,1,1}, 
                          {1,1,1},
@@ -217,7 +226,38 @@ void dilateFilter(Mat &source, Mat &destination){
     }
 }
 
-void blobColouring(const Mat &source, Mat &destination, Mat &regions){
+void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMoments){
+    //Modfify these values after making Tests for each figure
+    //Also modify the labels in the Texts for each Axis Limit
+    //Batman
+    double huPhi1Fig1Median = 0.323892;
+    double huPhi2Fig1Median = 0.061432;
+    double huPhi1Fig1STDDev = 0.028067;
+    double huPhi2Fig1STDDev = 0.015119;
+
+    //Green Lantern
+    double huPhi1Fig2Median = 0.180975;
+    double huPhi2Fig2Median = 0.003675;
+    double huPhi1Fig2STDDev = 0.001889;
+    double huPhi2Fig2STDDev = 0.000450;
+
+    //Flash
+    double huPhi1Fig3Median = 0.27;
+    double huPhi2Fig3Median = 0.005;
+    double huPhi1Fig3STDDev = 0.03;
+    double huPhi2Fig3STDDev = 0.0002;
+
+    //Superman
+    double huPhi1Fig4Median = 0.182838;
+    double huPhi2Fig4Median = 0.002124;
+    double huPhi1Fig4STDDev = 0.007898;
+    double huPhi2Fig4STDDev = 0.001082;
+
+    double maxPhi1 = 0.40;
+    double maxPhi2 = 0.20;
+
+    //
+
     int colors[10][3];
     colors[0][0] = 255; colors[0][1] = 255; colors[0][2] = 255;
     colors[1][0] =   0; colors[1][1] = 255; colors[1][2] =   0;
@@ -257,6 +297,15 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions){
     if (destination.empty()){
         destination = Mat(source.rows, source.cols, source.type());
         regions = Mat(source.rows, source.cols, source.type());
+        huMoments = Mat(484, 576, source.type());
+    }
+
+    for(int i = 0; i < huMoments.rows; i++){
+        for(int j = 0; j < huMoments.cols; j++){
+            huMoments.at<Vec3b>(i,j)[0] = 255;
+            huMoments.at<Vec3b>(i,j)[1] = 255;
+            huMoments.at<Vec3b>(i,j)[2] = 255;
+        }
     }
     
     for(int i = 0; i< source.rows; i++){
@@ -430,10 +479,15 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions){
 
             double xC = lookUpTable[i][2]/lookUpTable[i][1];
             double yC = lookUpTable[i][3]/lookUpTable[i][1];
-            printf("Region: %3d Area: %6d pixels  Color: %7s  Xc: %4d  Yc: %4d Theta: %7.3f Phi1: %8.6f Phi2: %8.6f\n", 
+
+            phis_1[training_counter] = phi_1;
+            phis_2[training_counter] = phi_2;
+
+            printf("Region: %3d Area: %6d pixels  Color: %7s  Xc: %4d  Yc: %4d Theta: %7.3f  Phi1: %8.6f Phi2: %8.6f\n", 
                     i,int(lookUpTable[i][1]),colorName[(i%7)+1].c_str(),int(lookUpTable[i][2]/lookUpTable[i][1]),
                     int(lookUpTable[i][3]/lookUpTable[i][1]),angle, phi_1, phi_2);
-            line( 
+
+                 line( 
                 regions, 
                 Point( lookUpTable[i][2]/lookUpTable[i][1], lookUpTable[i][3]/lookUpTable[i][1]),
                 Point( lookUpTable[i][2]/lookUpTable[i][1], lookUpTable[i][3]/lookUpTable[i][1]),
@@ -484,6 +538,292 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions){
                     );
 
             }
+
+            int relPhi1 = int((0.8*huMoments.cols*phi_1/maxPhi1)+0.1*huMoments.cols);
+            int relPhi2 = int(0.9*huMoments.rows-(0.8*huMoments.rows*phi_2/maxPhi2));
+            int redHu   = colors[i%7+1][2];
+            int greenHu  = colors[i%7+1][1];
+            int blueHu = colors[i%7+1][0];
+            line( 
+                huMoments, 
+                Point(relPhi1,relPhi2),
+                Point(relPhi1,relPhi2),
+                Scalar(blueHu,greenHu,redHu),
+                int(0.000030*huMoments.rows*huMoments.cols), 
+                8, 
+                0  
+                );
+
+            line( 
+                regions, 
+                Point( lookUpTable[i][2]/lookUpTable[i][1], lookUpTable[i][3]/lookUpTable[i][1]),
+                Point( lookUpTable[i][2]/lookUpTable[i][1], lookUpTable[i][3]/lookUpTable[i][1]),
+                Scalar(0,0,0),
+                4, 
+                8, 
+                0  
+                );
+
+            //Drawing Hu Moments Graph
+            //Axis and Text
+            line( 
+                huMoments, 
+                Point(int(0.1*huMoments.cols), int(0.1*huMoments.rows)),
+                Point(int(0.1*huMoments.cols), int((0.9+0.05)*huMoments.rows)),
+                Scalar(0,0,0),
+                2, 
+                8, 
+                0  
+                );
+            line( 
+                huMoments, 
+                Point(int(0.1*huMoments.cols), int(0.1*huMoments.rows)),
+                Point(int((0.1-0.02)*huMoments.cols), int((0.1+0.03)*huMoments.rows)),
+                Scalar(0,0,0),
+                2, 
+                8, 
+                0  
+                );
+            line( 
+                huMoments, 
+                Point(int(0.1*huMoments.cols), int(0.1*huMoments.rows)),
+                Point(int((0.1+0.02)*huMoments.cols), int((0.1+0.03)*huMoments.rows)),
+                Scalar(0,0,0),
+                2, 
+                8, 
+                0  
+                );
+
+            line( 
+                huMoments, 
+                Point(int((0.1-0.05)*huMoments.cols), int(0.9*huMoments.rows)),
+                Point(int(0.9*huMoments.cols), int(0.9*huMoments.rows)),
+                Scalar(0,0,0),
+                2, 
+                8, 
+                0  
+                );
+            line( 
+                huMoments, 
+                Point(int(0.9*huMoments.cols), int(0.9*huMoments.rows)),
+                Point(int((0.9-0.03)*huMoments.cols), int((0.9-0.02)*huMoments.rows)),
+                Scalar(0,0,0),
+                2, 
+                8, 
+                0  
+                );
+            line( 
+                huMoments, 
+                Point(int(0.9*huMoments.cols), int(0.9*huMoments.rows)),
+                Point(int((0.9-0.03)*huMoments.cols), int((0.9+0.02)*huMoments.rows)),
+                Scalar(0,0,0),
+                2, 
+                8, 
+                0  
+                );
+
+            putText(huMoments,"0",Point(int((0.1-0.03)*huMoments.cols), int((0.9+0.04)*huMoments.rows)),
+                FONT_HERSHEY_SIMPLEX, 0.000002*(huMoments.cols*huMoments.rows), Scalar(0,0,0), 1);
+            putText(huMoments,"Phi1",Point(int((0.9)*huMoments.cols), int((0.9+0.07)*huMoments.rows)),
+                FONT_HERSHEY_SIMPLEX, 0.000003*(huMoments.cols*huMoments.rows), Scalar(0,0,0), 2);
+            putText(huMoments,"0.40",Point(int((0.9-0.07)*huMoments.cols), int((0.9+0.05)*huMoments.rows)),
+                FONT_HERSHEY_SIMPLEX, 0.000002*(huMoments.cols*huMoments.rows), Scalar(0,0,0), 1);
+
+            putText(huMoments,"Phi2",Point(int((0.1-0.08)*huMoments.cols), int((0.1-0.03)*huMoments.rows)),
+                FONT_HERSHEY_SIMPLEX, 0.000003*(huMoments.cols*huMoments.rows), Scalar(0,0,0), 2);
+            putText(huMoments,"0.20",Point(int((0.1-0.09)*huMoments.cols), int((0.1+0.03)*huMoments.rows)),
+                FONT_HERSHEY_SIMPLEX, 0.000002*(huMoments.cols*huMoments.rows), Scalar(0,0,0), 1);
+
+            //Areas for each Figure Detection
+            int fig1RelPhi1 = int((0.8*huMoments.cols*huPhi1Fig1Median/maxPhi1)+0.1*huMoments.cols);
+            int fig1RelPhi2 = int(0.9*huMoments.rows-(0.8*huMoments.rows*huPhi2Fig1Median/maxPhi2));
+            int fig1RelPhi1Dev = int(0.8*huMoments.cols*huPhi1Fig1STDDev/maxPhi1);
+            int fig1RelPhi2Dev = int(0.8*huMoments.cols*huPhi2Fig1STDDev/maxPhi2);
+
+            int fig2RelPhi1 = int((0.8*huMoments.cols*huPhi1Fig2Median/maxPhi1)+0.1*huMoments.cols);
+            int fig2RelPhi2 = int(0.9*huMoments.rows-(0.8*huMoments.rows*huPhi2Fig2Median/maxPhi2));
+            int fig2RelPhi1Dev = int(0.8*huMoments.cols*huPhi1Fig2STDDev/maxPhi1);
+            int fig2RelPhi2Dev = int(0.8*huMoments.cols*huPhi2Fig2STDDev/maxPhi2);
+
+            int fig3RelPhi1 = int((0.8*huMoments.cols*huPhi1Fig3Median/maxPhi1)+0.1*huMoments.cols);
+            int fig3RelPhi2 = int(0.9*huMoments.rows-(0.8*huMoments.rows*huPhi2Fig3Median/maxPhi2));
+            int fig3RelPhi1Dev = int(0.8*huMoments.cols*huPhi1Fig3STDDev/maxPhi1);
+            int fig3RelPhi2Dev = int(0.8*huMoments.cols*huPhi2Fig3STDDev/maxPhi2);
+
+            int fig4RelPhi1 = int((0.8*huMoments.cols*huPhi1Fig4Median/maxPhi1)+0.1*huMoments.cols);
+            int fig4RelPhi2 = int(0.9*huMoments.rows-(0.8*huMoments.rows*huPhi2Fig4Median/maxPhi2));
+            int fig4RelPhi1Dev = int(0.8*huMoments.cols*huPhi1Fig4STDDev/maxPhi1);
+            int fig4RelPhi2Dev = int(0.8*huMoments.cols*huPhi2Fig4STDDev/maxPhi2);
+
+            line( 
+                huMoments, 
+                Point(fig1RelPhi1,fig1RelPhi2),
+                Point(fig1RelPhi1,fig1RelPhi2),
+                Scalar(0,0,240),
+                int(0.00003*huMoments.rows*huMoments.cols), 
+                8, 
+                0  
+                );
+            line( 
+                huMoments, 
+                Point(fig2RelPhi1,fig2RelPhi2),
+                Point(fig2RelPhi1,fig2RelPhi2),
+                Scalar(0,0,240),
+                int(0.00003*huMoments.rows*huMoments.cols), 
+                8, 
+                0  
+                );
+            line( 
+                huMoments, 
+                Point(fig3RelPhi1,fig3RelPhi2),
+                Point(fig3RelPhi1,fig3RelPhi2),
+                Scalar(0,0,240),
+                int(0.00003*huMoments.rows*huMoments.cols), 
+                8, 
+                0  
+                );
+            line( 
+                huMoments, 
+                Point(fig4RelPhi1,fig4RelPhi2),
+                Point(fig4RelPhi1,fig4RelPhi2),
+                Scalar(0,0,240),
+                int(0.00003*huMoments.rows*huMoments.cols), 
+                8, 
+                0  
+                );
+
+            //Draw STD Deviation Ellipses
+            ellipse(huMoments, Point(fig1RelPhi1,fig1RelPhi2), Size(fig1RelPhi1Dev,fig1RelPhi2Dev), 0, 0, 360, Scalar( 0, 0, 0 ), 1, 8 );
+            line( 
+                huMoments, 
+                Point(fig1RelPhi1,fig1RelPhi2+fig1RelPhi2Dev),
+                Point(fig1RelPhi1,fig1RelPhi2-fig1RelPhi2Dev),
+                Scalar(0,0,0),
+                1, 
+                8, 
+                0  
+                );
+            line( 
+                huMoments, 
+                Point(fig1RelPhi1+fig1RelPhi1Dev,fig1RelPhi2),
+                Point(fig1RelPhi1-fig1RelPhi1Dev,fig1RelPhi2),
+                Scalar(0,0,0),
+                1,
+                8, 
+                0  
+                );
+            putText(huMoments,"Batman",Point(fig1RelPhi1+fig1RelPhi1Dev, fig1RelPhi2),
+                FONT_HERSHEY_SIMPLEX, 0.000002*(huMoments.cols*huMoments.rows), Scalar(0,0,0), 1);
+
+            ellipse(huMoments, Point(fig2RelPhi1,fig2RelPhi2), Size(fig2RelPhi1Dev,fig2RelPhi2Dev), 0, 0, 360, Scalar( 0, 200, 0 ), 1, 8 );
+            line( 
+                huMoments, 
+                Point(fig2RelPhi1,fig2RelPhi2+fig2RelPhi2Dev),
+                Point(fig2RelPhi1,fig2RelPhi2-fig2RelPhi2Dev),
+                Scalar(0,200,0),
+                1, 
+                8, 
+                0  
+                );
+            line( 
+                huMoments, 
+                Point(fig2RelPhi1+fig2RelPhi1Dev,fig2RelPhi2),
+                Point(fig2RelPhi1-fig2RelPhi1Dev,fig2RelPhi2),
+                Scalar(0,200,0),
+                1,
+                8, 
+                0  
+                );
+            putText(huMoments,"Green Lantern",Point(fig2RelPhi1+fig2RelPhi1Dev, fig2RelPhi2),
+                FONT_HERSHEY_SIMPLEX, 0.000002*(huMoments.cols*huMoments.rows), Scalar(0,200,0), 1);
+
+            ellipse(huMoments, Point(fig3RelPhi1,fig3RelPhi2), Size(fig3RelPhi1Dev,fig3RelPhi2Dev), 0, 0, 360, Scalar( 0, 0, 200 ), 1, 8 );
+            line( 
+                huMoments, 
+                Point(fig3RelPhi1,fig3RelPhi2+fig3RelPhi2Dev),
+                Point(fig3RelPhi1,fig3RelPhi2-fig3RelPhi2Dev),
+                Scalar(0,0,200),
+                1, 
+                8, 
+                0  
+                );
+            line( 
+                huMoments, 
+                Point(fig3RelPhi1+fig3RelPhi1Dev,fig3RelPhi2),
+                Point(fig3RelPhi1-fig3RelPhi1Dev,fig3RelPhi2),
+                Scalar(0,0,200),
+                1,
+                8, 
+                0  
+                );
+            putText(huMoments,"Flash",Point(fig3RelPhi1+fig3RelPhi1Dev, fig3RelPhi2),
+                FONT_HERSHEY_SIMPLEX, 0.000002*(huMoments.cols*huMoments.rows), Scalar(0,0,200), 1);
+
+            ellipse(huMoments, Point(fig4RelPhi1,fig4RelPhi2), Size(fig4RelPhi1Dev,fig4RelPhi2Dev), 0, 0, 360, Scalar( 200, 0, 0 ), 1, 8 );
+            line( 
+                huMoments, 
+                Point(fig4RelPhi1,fig4RelPhi2+fig4RelPhi2Dev),
+                Point(fig4RelPhi1,fig4RelPhi2-fig4RelPhi2Dev),
+                Scalar(200,0,0),
+                1, 
+                8, 
+                0  
+                );
+            line( 
+                huMoments, 
+                Point(fig4RelPhi1+fig4RelPhi1Dev,fig4RelPhi2),
+                Point(fig4RelPhi1-fig4RelPhi1Dev,fig4RelPhi2),
+                Scalar(200,0,0),
+                1,
+                8, 
+                0  
+                );
+            putText(huMoments,"Superman",Point(fig4RelPhi1+fig4RelPhi1Dev, fig4RelPhi2),
+                FONT_HERSHEY_SIMPLEX, 0.000002*(huMoments.cols*huMoments.rows), Scalar(200,0,0), 1);
+            
+
+            ///*
+            if(++training_counter%20 == 0) {
+
+                float sum_1 = 0;
+                float sum_2 = 0;
+                printf("\nEntrenamiento\n");
+
+                //Phis 1 average and standar deviation
+                for(int l = 0; l < 20; l++) {
+                   sum_1 += phis_1[l];
+                }
+
+                phis_1_average = sum_1 / 20.0;
+                sum_1 = 0;
+
+                for(int l = 0; l < 20; l++) {
+                   sum_1 += pow(phis_1[l] - phis_1_average, 2);
+                }
+
+                phis_1_sd = pow(sum_1 / 19.0, 0.5);
+
+                //Phis 2 average and standar deviation
+                for(int l = 0; l < 20; l++) {
+                   sum_2 += phis_2[l];
+                }
+
+                phis_2_average = sum_2 / 20.0;
+                sum_2 = 0;
+
+                for(int l = 0; l < 20; l++) {
+                   sum_2 += pow(phis_2[l] - phis_2_average, 2);
+                }
+
+                phis_2_sd = pow(sum_2 / 19.0, 0.5);
+
+                printf("Region: %3d Area: %6d pixels  Color: %7s  Xc: %4d  Yc: %4d Theta: %7.3f   Av-Phi1: %8.6f Av-Phi2: %8.6f\n Sd-Phi1: %8.6f Sd-Phi2: %8.6f\n",
+                    i,int(lookUpTable[i][1]),colorName[(i%7)+1].c_str(),int(lookUpTable[i][2]/lookUpTable[i][1]),
+                    int(lookUpTable[i][3]/lookUpTable[i][1]),angle, phis_1_average, phis_2_average, phis_1_sd, phis_2_sd);
+            }
+
+            training_counter = training_counter%20;
+            //*/
         }
     }
     cout<<endl;  
@@ -552,10 +892,10 @@ int main(int argc,char* argv[])
 	// Destination OpenCV Mat	
 	Mat currentImage = Mat(240, 320, CV_8UC3);
     //Filters and Segmentation
-    Mat filteredHsvImage,blobDetection,colouredRegions, dilateF;  
+    Mat filteredHsvImage,blobDetection,colouredRegions, dilateF, huMoments;  
 
-    
-    while (stop == false){
+    ///*
+    while (stop == false) {
         //image is captured
         heli->renewImage(image);
         // Copy to OpenCV Mat
@@ -563,12 +903,13 @@ int main(int argc,char* argv[])
 
         imageHSVFunction(currentImage, filteredHsvImage);  
         dilateFilter(filteredHsvImage, dilateF);             
-        blobColouring(dilateF,blobDetection,colouredRegions);
+        blobColouring(dilateF,blobDetection,colouredRegions,huMoments);
         imshow("Original"         , currentImage);
         imshow("HSV Filter"       , filteredHsvImage);
         imshow("Dilate Filter"    , dilateF);
         imshow("Blob Colouring"   , blobDetection);
         imshow("Coloured Regions ", colouredRegions);
+        imshow("Hu Moments "      , huMoments);
 
         waitKey(0);
         char key = waitKey(5);
@@ -578,10 +919,10 @@ int main(int argc,char* argv[])
         }
         usleep(15000);
     }
-    
+    //*/
 
     // Initialize joystick
-    
+    /*
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK);
     useJoystick = SDL_NumJoysticks() > 0;
     if (useJoystick)
@@ -605,9 +946,9 @@ int main(int argc,char* argv[])
             joypadPitch = SDL_JoystickGetAxis(m_joystick, 3);
             joypadVerticalSpeed = SDL_JoystickGetAxis(m_joystick, 1);
             joypadYaw = SDL_JoystickGetAxis(m_joystick, 0);
-            joypadTakeOff = SDL_JoystickGetButton(m_joystick, 1);
-            joypadLand = SDL_JoystickGetButton(m_joystick, 2);
-            joypadHover = SDL_JoystickGetButton(m_joystick, 0);
+            joypadTakeOff = SDL_JoystickGetButton(m_joystick, 0);
+            joypadLand = SDL_JoystickGetButton(m_joystick, 6);
+            joypadHover = SDL_JoystickGetButton(m_joystick, 5);
         }
 
         // prints the drone telemetric data, helidata struct contains drone angles, speeds and battery status
@@ -681,7 +1022,7 @@ int main(int argc,char* argv[])
 	
 	heli->land();
     SDL_JoystickClose(m_joystick);
-    
+    */
     waitKey(0);
     delete heli;
 	delete image;
