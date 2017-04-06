@@ -52,7 +52,7 @@ string ultimo = "init";
 // Destination OpenCV Mat   
 Mat currentImage;
 //Filters and Segmentation
-Mat filteredHsvImage,blobDetection,colouredRegions, dilateF, huMoments;  
+Mat filteredHsvImage,blobDetection,colouredRegions, dilateF, huMoments, meanF;  
 
 void grayScale(const Mat &source, Mat &destination){
     int g;
@@ -109,12 +109,18 @@ int hMin = 0;
 int hMax = 0;
 int sMin = 0;
 int sMax = 0; 
-int vMin = 192;
-int vMax = 232;
+int vMin = 144;
+int vMax = 208;
 
 char meanMat3[3][3]  =  {{1,1,1}, 
                          {1,1,1},
                          {1,1,1}};
+ 
+char meanMat5[5][5]  =  {{1,1,1,1,1}, 
+                         {1,1,1,1,1},
+                         {1,1,1,1,1},
+                         {1,1,1,1,1},
+                         {1,1,1,1,1}};
 
 void imageHSVFunction(const Mat &sourceImage, Mat &FilteredImage){
     int max,min, v, h,r,g,b;
@@ -208,8 +214,35 @@ void imageHSVFunction(const Mat &sourceImage, Mat &FilteredImage){
         }
 }
 
+void meanFilter(Mat &source, Mat &destination){
+    int mean, size;
+    size = 3;
+    if (destination.empty())
+        destination = Mat(source.rows, source.cols, source.type());
+
+    for(int i = 0; i< source.rows; i++){
+        for(int j = 0; j< source.cols;j++){
+            mean = 0;
+            if(i>0 && i<source.rows-(size/2) && j>0 && j<source.cols-(size/2)){
+                for(int k = 0; k < size; k++){
+                    for(int l = 0; l < size; l++){
+                        mean = mean + meanMat3[k][l]*source.at<Vec3b>(i-(size/2)+k, j-(size/2)+l)[0];
+                    }   
+                }
+                mean = mean/(size*size);
+            }
+            else
+                mean = source.at<Vec3b>(i,j)[0];
+
+            destination.at<Vec3b>(i,j)[0] = mean;
+            destination.at<Vec3b>(i,j)[1] = mean;
+            destination.at<Vec3b>(i,j)[2] = mean;
+        }
+    }
+}
+
 void dilateFilter(Mat &source, Mat &destination){
-    int val,size;
+    int val,size, neighbors;
     bool on;
     size = 3;
     if (destination.empty())
@@ -219,11 +252,15 @@ void dilateFilter(Mat &source, Mat &destination){
         for(int j = 0; j< source.cols;j++){
             if(i>0 && i<source.rows-(size/2) && j>0 && j<source.cols-(size/2)){
                 on = false;
+                neighbors = 0;
                 for(int k = 0; k < size && !on; k++){
                     for(int l = 0; l < size && !on; l++){
                         val = meanMat3[k][l]*source.at<Vec3b>(i-(size/2)+k, j-(size/2)+l)[0];
-                        if(val < 255)
-                            on = true;
+                        if(val < 100){
+                            neighbors++;
+                            if(neighbors > 5)
+                                on = true;
+                        }
                     }   
                 }
                 if(on)
@@ -831,7 +868,7 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
                 //float theta1 = thetas[4];
                 float phi1_median2 = phis_1[7];
                 float phi2_median2 = phis_2[7];
-                float theta2 = thetas[4];
+                float theta2 = thetas[7];
 
                 int relPhi1_1 = int((0.8*huMoments.cols*phi1_median1/maxPhi1)+0.1*huMoments.cols);
                 int relPhi2_1 = int(0.9*huMoments.rows-(0.8*huMoments.rows*phi2_median1/maxPhi2));
@@ -858,6 +895,7 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
                     0  
                 );
 
+                /*
                 line( 
                     huMoments, 
                     Point(phi1_median2,phi2_median2),
@@ -867,6 +905,7 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
                     8, 
                     0  
                 );
+                */
 
                 //Detecting Figures
                 float distanceMin1 = 2;
@@ -878,6 +917,7 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
                         if(distanceSample < distanceMin2){
                             distanceMin2 = distanceSample;
                             fig1Detected = 1;
+                            fig4Detected = 0;
                             angleDetected = theta2;
 
                         }
@@ -888,6 +928,7 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
                         if(distanceSample < distanceMin2){
                             distanceMin2 = distanceSample;
                             fig4Detected = 1;
+                            fig1Detected = 0;
                             angleDetected = theta2;
                         }
                     }
@@ -899,6 +940,7 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
                         if(distanceSample < distanceMin1){
                             distanceMin1 = distanceSample;
                             fig2Detected = 1;
+                            fig3Detected = 0;
                         }
                     }
                 }
@@ -908,11 +950,10 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
                         if(distanceSample < distanceMin1){
                             distanceMin1 = distanceSample;
                             fig3Detected = 1;
+                            fig2Detected = 0;
                         }
                     }
-                }
-                
-
+                }          
                 training_counter = training_counter % 20;
                 figureDetection = 1;
             }
@@ -984,7 +1025,15 @@ void rawToMat( Mat &destImage, CRawImage* sourceImage){
 
 
 void automaticMode() {
-    cout<<"Automatic Mode On"<<endl;
+    int x = 0;
+    x++;
+    /*
+        Pitch movement forward and back
+        Roll moves left and right
+        Yaw spins the drone right or left in his own axis
+    */
+
+   /* cout<<"Automatic Mode On"<<endl;
     //Despegue
     heli->takeoff();
     usleep(35000);
@@ -996,7 +1045,7 @@ void automaticMode() {
     usleep(20000);
     heli->setAngles(0.0, 10000.0, 0.0, 0.0, 0.0);
             usleep(10000);
-    cout<<"hover"<<endl;
+    cout<<"hover"<<endl;*/
 /*
     imageHSVFunction(currentImage, filteredHsvImage);  
     dilateFilter(filteredHsvImage, dilateF);             
@@ -1097,9 +1146,11 @@ int main(int argc,char* argv[])
         rawToMat(currentImage, image);
 
         imageHSVFunction(currentImage, filteredHsvImage);  
-        dilateFilter(filteredHsvImage, dilateF);             
+        meanFilter(filteredHsvImage, meanF);
+        dilateFilter(meanF, dilateF);             
         blobColouring(dilateF,blobDetection,colouredRegions,huMoments);
         imshow("Original"         , currentImage);
+        imshow("Low Pass Filter"  , meanF);
         imshow("HSV Filter"       , filteredHsvImage);
         imshow("Dilate Filter"    , dilateF);
         //imshow("Blob Colouring"   , blobDetection);
@@ -1161,37 +1212,69 @@ int main(int argc,char* argv[])
         */
 	    if(fig1Detected+fig2Detected+fig3Detected+fig4Detected >= 1){
             figureDetection = 0;
+
             if(fig1Detected){
                 cout<<"Batman Detected with Angle: "<<angleDetected<<endl;
-              //heli->setAngles(pitch, roll, yaw, height, hover);
-                heli->setAngles(0.0, 5000.0, 0.0, 0.0, 0.0);
-                usleep(10000);
             }
-            if(fig4Detected){
+            else if(fig4Detected){
                 cout<<"Flash Detected with Angle: "<<angleDetected<<endl;
-              //heli->setAngles(pitch, roll, yaw, height, hover);
-                heli->setAngles(0.0, -5000.0, 0.0, 0.0, 0.0);
-                usleep(10000);
             }
             if(fig2Detected){
-                cout<<"Green Lantern Detected"<<endl;
-              //heli->setAngles(pitch, roll, yaw, height, hover);
-                heli->setAngles(5000.0, 0.0, 0.0, 0.0, 0.0);
-                usleep(10000);
+                 cout<<"Green Lantern Detected"<<endl;
             }
-            if(fig3Detected){
+            else if(fig3Detected){
                 cout<<"Arrow Detected"<<endl;
-              //heli->setAngles(pitch, roll, yaw, height, hover);
-                heli->setAngles(-5000.0, 0.0, 0.0, 0.0, 0.0);
-                usleep(10000);
             }
             if(fig1Detected+fig2Detected+fig3Detected+fig4Detected >= 1)
                 cout<<endl;
 
-            fig1Detected = 0;
-            fig2Detected = 0;
-            fig3Detected = 0;
-            fig4Detected = 0;       
+            if(automatic == 1){
+                cout<<"AUTOMATIC ON"<<endl;
+                int height;
+                if(angleDetected <= 0)
+                    height = 10000;
+                else
+                    height = -10000;
+
+                if(fig1Detected){
+                    cout<<"Batman Detected with Angle: "<<angleDetected<<" Going Right"<<endl;
+                  //heli->setAngles(pitch, roll, yaw, height, hover);
+                    heli->setAngles(0.0, 10000.0, 0.0, 0.0, 0.0);
+                    usleep(500000);
+                }
+                else if(fig4Detected){
+                    cout<<"Flash Detected with Angle: "<<angleDetected<<" Going Left"<<endl;
+                  //heli->setAngles(pitch, roll, yaw, height, hover);
+                    heli->setAngles(0.0, -10000.0, 0.0, 0.0, 0.0);
+                    usleep(500000);
+                }
+                if(fig2Detected){
+                    cout<<"Green Lantern Detected"<<" Going Back"<<endl;
+                  //heli->setAngles(pitch, roll, yaw, height, hover);
+                    heli->setAngles(10000.0, 0.0, 0.0, 0.0, 0.0);
+                    usleep(500000);
+                }
+                else if(fig3Detected){
+                    cout<<"Arrow Detected"<<" Going Forward"<<endl;
+                  //heli->setAngles(pitch, roll, yaw, height, hover);
+                    heli->setAngles(-10000.0, 0.0, 0.0, 0.0, 0.0);
+                    usleep(500000);
+                }
+                if(angleDetected <= 0)
+                    cout<<"Going Up"<<endl;
+                else
+                    cout<<"Going Down"<<endl;
+
+                heli->setAngles(0.0, 0.0, 0.0, height, 0.0);
+                usleep(500000);
+                if(fig1Detected+fig2Detected+fig3Detected+fig4Detected >= 1)
+                    cout<<endl;
+
+                fig1Detected = 0;
+                fig2Detected = 0;
+                fig3Detected = 0;
+                fig4Detected = 0;   
+            }    
         }
         //*/	   
         if(automatic == 1)
