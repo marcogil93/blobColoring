@@ -52,7 +52,7 @@ string ultimo = "init";
 // Destination OpenCV Mat   
 Mat currentImage;
 //Filters and Segmentation
-Mat filteredHsvImage,blobDetection,colouredRegions, dilateF, huMoments;  
+Mat filteredHsvImage,blobDetection,colouredRegions, dilateF, huMoments, meanF;  
 
 void grayScale(const Mat &source, Mat &destination){
     int g;
@@ -109,12 +109,26 @@ int hMin = 0;
 int hMax = 0;
 int sMin = 0;
 int sMax = 0; 
-int vMin = 192;
-int vMax = 232;
+int vMin = 128;
+int vMax = 216;
 
 char meanMat3[3][3]  =  {{1,1,1}, 
                          {1,1,1},
                          {1,1,1}};
+ 
+char meanMat5[5][5]  =  {{1,1,1,1,1}, 
+                         {1,1,1,1,1},
+                         {1,1,1,1,1},
+                         {1,1,1,1,1},
+                         {1,1,1,1,1}};
+
+char meanMat7[7][7]  =  {{1,1,1,1,1,1,1}, 
+                         {1,1,1,1,1,1,1}, 
+                         {1,1,1,1,1,1,1}, 
+                         {1,1,1,1,1,1,1}, 
+                         {1,1,1,1,1,1,1}, 
+                         {1,1,1,1,1,1,1}, 
+                         {1,1,1,1,1,1,1}};
 
 void imageHSVFunction(const Mat &sourceImage, Mat &FilteredImage){
     int max,min, v, h,r,g,b;
@@ -208,6 +222,33 @@ void imageHSVFunction(const Mat &sourceImage, Mat &FilteredImage){
         }
 }
 
+void meanFilter(Mat &source, Mat &destination){
+    int mean, size;
+    size = 7;
+    if (destination.empty())
+        destination = Mat(source.rows, source.cols, source.type());
+
+    for(int i = 0; i< source.rows; i++){
+        for(int j = 0; j< source.cols;j++){
+            mean = 0;
+            if(i>0 && i<source.rows-(size/2) && j>0 && j<source.cols-(size/2)){
+                for(int k = 0; k < size; k++){
+                    for(int l = 0; l < size; l++){
+                        mean = mean + meanMat7[k][l]*source.at<Vec3b>(i-(size/2)+k, j-(size/2)+l)[0];
+                    }   
+                }
+                mean = mean/(size*size);
+            }
+            else
+                mean = source.at<Vec3b>(i,j)[0];
+
+            destination.at<Vec3b>(i,j)[0] = mean;
+            destination.at<Vec3b>(i,j)[1] = mean;
+            destination.at<Vec3b>(i,j)[2] = mean;
+        }
+    }
+}
+
 void dilateFilter(Mat &source, Mat &destination){
     int val,size, neighbors;
     bool on;
@@ -223,9 +264,9 @@ void dilateFilter(Mat &source, Mat &destination){
                 for(int k = 0; k < size && !on; k++){
                     for(int l = 0; l < size && !on; l++){
                         val = meanMat3[k][l]*source.at<Vec3b>(i-(size/2)+k, j-(size/2)+l)[0];
-                        if(val < 255){
+                        if(val < 100){
                             neighbors++;
-                            if(neighbors > 3)
+                            if(neighbors > 6)
                                 on = true;
                         }
                     }   
@@ -380,8 +421,10 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
                 else if(source.at<Vec3b>(i-1,j)[0] == 0 && source.at<Vec3b>(i,j-1)[0] == 0){
                     int left, top;
                     top = lookUpTable[temporal[i-1][j]][0]; 
-                    left = lookUpTable[temporal[i][j-1]][0];              
+                    left = lookUpTable[temporal[i][j-1]][0];            
                     if(top <= left ){
+                        if(top <= lookUpTable[left][0])
+                            lookUpTable[left][0] = top;
                         temporal[i][j]= temporal[i-1][j];
                         lookUpTable[top][1]++;
                         lookUpTable[top][2]+= j;
@@ -389,9 +432,10 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
                         lookUpTable[top][4] = lookUpTable[top][4] + (j*j);
                         lookUpTable[top][5] = lookUpTable[top][5] + (i*i);
                         lookUpTable[top][6] = lookUpTable[top][6] + (j*i);
-                        lookUpTable[left][0] = top;
                     }
                     else{
+                        if(left <= lookUpTable[top][0])
+                            lookUpTable[top][0] = left;
                         temporal[i][j] = temporal[i][j-1];
                         lookUpTable[left][1]++;
                         lookUpTable[left][2]+= j;
@@ -399,7 +443,6 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
                         lookUpTable[left][4] = lookUpTable[left][4] + (j*j);
                         lookUpTable[left][5] = lookUpTable[left][5] + (i*i);
                         lookUpTable[left][6] = lookUpTable[left][6] + (j*i);
-                        lookUpTable[top][0] = left;
                     }
                     
                     destination.at<Vec3b>(i,j)[0] = colors[(temporal[i][j])%7+1][0];
@@ -415,6 +458,10 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
         }
     }
     
+    /*for(int u = 0; u < k; u++)
+        cout<<u<<" "<<lookUpTable[u][0]<<endl;
+    */
+
     int finalIndex, tempArea, tempX, tempY, tempXSquare, tempYSquare, tempXY;
     for(int i = 0; i< source.rows; i++){
         for(int j = 0; j< source.cols;j++){
@@ -500,8 +547,8 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
             double yC = lookUpTable[i][3]/lookUpTable[i][1];
 
             string col = colorName[(i%7)+1].c_str();
-            /*
-            printf("Region: %3d Area: %6d pixels  Color: %7s  Xc: %4d  Yc: %4d Theta: %7.3f  Phi1: %8.6f Phi2: %8.6f\n", 
+            
+            /*printf("Region: %3d Area: %6d pixels  Color: %7s  Xc: %4d  Yc: %4d Theta: %7.3f  Phi1: %8.6f Phi2: %8.6f\n", 
                     i,int(lookUpTable[i][1]),colorName[(i%7)+1].c_str(),int(lookUpTable[i][2]/lookUpTable[i][1]),
                     int(lookUpTable[i][3]/lookUpTable[i][1]),angle, phi_1, phi_2);
             */
@@ -835,7 +882,7 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
                 //float theta1 = thetas[4];
                 float phi1_median2 = phis_1[7];
                 float phi2_median2 = phis_2[7];
-                float theta2 = thetas[4];
+                float theta2 = thetas[7];
 
                 int relPhi1_1 = int((0.8*huMoments.cols*phi1_median1/maxPhi1)+0.1*huMoments.cols);
                 int relPhi2_1 = int(0.9*huMoments.rows-(0.8*huMoments.rows*phi2_median1/maxPhi2));
@@ -862,6 +909,7 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
                     0  
                 );
 
+                /*
                 line( 
                     huMoments, 
                     Point(phi1_median2,phi2_median2),
@@ -871,6 +919,7 @@ void blobColouring(const Mat &source, Mat &destination, Mat &regions, Mat &huMom
                     8, 
                     0  
                 );
+                */
 
                 //Detecting Figures
                 float distanceMin1 = 2;
@@ -1111,25 +1160,28 @@ int main(int argc,char* argv[])
         rawToMat(currentImage, image);
 
         imageHSVFunction(currentImage, filteredHsvImage);  
-        dilateFilter(filteredHsvImage, dilateF);             
+        meanFilter(filteredHsvImage, meanF);
+        dilateFilter(meanF, dilateF);             
         blobColouring(dilateF,blobDetection,colouredRegions,huMoments);
         imshow("Original"         , currentImage);
+        imshow("Low Pass Filter"  , meanF);
         imshow("HSV Filter"       , filteredHsvImage);
         imshow("Dilate Filter"    , dilateF);
         //imshow("Blob Colouring"   , blobDetection);
         imshow("Coloured Regions ", colouredRegions);
         imshow("Hu Moments "      , huMoments);
+        imshow("Blob Regions", blobDetection);
 
-        
-        //waitKey(0);
         /*
-        char key = waitKey(5);
-        switch (key) {
+        waitKey(0);
+        
+        char key1 = waitKey(5);
+        switch (key1) {
             case 27: stop = true; break;
-            default: pitch = roll = yaw = height = 0.0;
+            //default: pitch = roll = yaw = height = 0.0;
         }
-        usleep(15000);
-        */ 
+        //usleep(15000);
+        */
     //}
     ///*
     /*
@@ -1200,36 +1252,36 @@ int main(int argc,char* argv[])
                     height = -10000;
 
                 if(fig1Detected){
-                    cout<<"Batman Detected with Angle: "<<angleDetected<<" Going Left"<<endl;
+                    cout<<"Batman Detected with Angle: "<<angleDetected<<" Going Right"<<endl;
                   //heli->setAngles(pitch, roll, yaw, height, hover);
                     heli->setAngles(0.0, 10000.0, 0.0, 0.0, 0.0);
-                    usleep(1000000);
+                    usleep(500000);
                 }
                 else if(fig4Detected){
-                    cout<<"Flash Detected with Angle: "<<angleDetected<<" Going Right"<<endl;
+                    cout<<"Flash Detected with Angle: "<<angleDetected<<" Going Left"<<endl;
                   //heli->setAngles(pitch, roll, yaw, height, hover);
                     heli->setAngles(0.0, -10000.0, 0.0, 0.0, 0.0);
-                    usleep(1000000);
+                    usleep(500000);
                 }
                 if(fig2Detected){
-                    cout<<"Green Lantern Detected"<<" Going Front"<<endl;
+                    cout<<"Green Lantern Detected"<<" Going Back"<<endl;
                   //heli->setAngles(pitch, roll, yaw, height, hover);
                     heli->setAngles(10000.0, 0.0, 0.0, 0.0, 0.0);
-                    usleep(1000000);
+                    usleep(500000);
                 }
                 else if(fig3Detected){
-                    cout<<"Arrow Detected"<<" Going Back"<<endl;
+                    cout<<"Arrow Detected"<<" Going Forward"<<endl;
                   //heli->setAngles(pitch, roll, yaw, height, hover);
                     heli->setAngles(-10000.0, 0.0, 0.0, 0.0, 0.0);
-                    usleep(1000000);
+                    usleep(500000);
                 }
                 if(angleDetected <= 0)
-                    cout<<"Going Down"<<endl;
-                else
                     cout<<"Going Up"<<endl;
+                else
+                    cout<<"Going Down"<<endl;
 
                 heli->setAngles(0.0, 0.0, 0.0, height, 0.0);
-                usleep(1000000);
+                usleep(500000);
                 if(fig1Detected+fig2Detected+fig3Detected+fig4Detected >= 1)
                     cout<<endl;
 
